@@ -1,6 +1,6 @@
 # ARGS: -f
 
-@main(arg1: int, arg2: int) {
+@f(arg1: int, arg2: int) {
   a: int = const 4;
   b: int = const 3;
   constant_fold2: bool = eq a b;
@@ -19,4 +19,12 @@
 
   no_fold4: bool = lt arg1 arg1;
   no_fold5: bool = gt arg2 arg2;
+
+  print no_fold4;
+  print no_fold5;
+}
+
+@main() {
+  a: int = const 1;
+  call @f a a;
 }

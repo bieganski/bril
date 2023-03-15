@@ -1,6 +1,6 @@
 # ARGS: -f
 
-@main(arg1: bool, arg2: bool) {
+@f(arg1: bool, arg2: bool) {
   t: bool = const true;
   f: bool = const false;
 
@@ -23,4 +23,9 @@
   no_fold5: bool = and arg1 arg2;
   no_fold6: bool = or arg1 arg2;
   no_fold7: bool = not arg1;
+}
+
+@main() {
+  a: bool = const true;
+  call @f a a;
 }

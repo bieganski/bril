@@ -12,15 +12,16 @@ def main(j):
             args = ins.get("args") or []
             used.extend(args)
 
-        # Remove assigned symbols that we know about that are globally unused.
-        rms = []
-        for i, ins in enumerate(f["instrs"]):
+        # Keep only those symbols, that we know about that are globally used somewhere.
+        new_instructions = []
+        for ins in f["instrs"]:
             dest = ins.get("dest")
             if dest and dest not in used:
-                rms.append(i)
+                pass
+            else:
+                new_instructions.append(ins)
         
-        for idx in rms:
-            f["instrs"].pop(idx)
+        f["instrs"] = new_instructions
 
 
 if __name__ == "__main__":
