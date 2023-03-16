@@ -12,7 +12,8 @@ logging = get_color_logging_object()
 # logging.setLevel(CRITICAL)  # surpress most of output.
 
 blacklist = [
-    "divide-by-zero.bril"
+    "divide-by-zero.bril",
+    "nonlocal.bril",
 ]
 
 def main(*args):

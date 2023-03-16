@@ -14,19 +14,61 @@ class Record:
     idx: int
 
 
-class Numbering(dict):
-    def __init__(self):
-        super(self)
-        self.fresh_idx = 0
+# class Numbering(dict):
+#     def __init__(self):
+#         super(self)
+#         self.fresh_idx = 0
 
-    def _fresh(self):
-        ret = self.fresh_idx
-        self.fresh_idx += 1
-        return ret
+#     def _fresh(self):
+#         ret = self.fresh_idx
+#         self.fresh_idx += 1
+#         return ret
+    
+#     def new(self, r: Record):
+#         r.idx = self._fresh()
+        
 
 @dataclass
 class State:
-    records: dict[str, Record] = field(default_factory=dict)
+    records: list[Record] = field(default_factory=list)
+
+@dataclass
+class Instruction:
+    op: str # the only obligatory field, due to bril specs.
+    type: str
+    args: list[str]
+    dest: Optional[str]
+    value: Optional[int]
+    funcs: Optional[list[str]]
+    
+
+    @staticmethod
+    def from_json(j: dict) -> "Instruction":
+        return Instruction(
+            op=j["op"],
+            args=j.get("args", []),
+            type=j.get("type", "int"),
+            
+            value=j.get("value"),
+            dest=j.get("dest"),
+
+            funcs = j.get("funcs")
+        )
+    
+    def to_json(self):
+        res = {"op": self.op, "args": self.args, "type": self.type}
+
+        for x in ["value", "dest", "funcs"]:
+            field = getattr(self, x)
+            if field is not None:
+                res[x] = field
+        
+        return res
+
+def ins_encode_decode_id(block: list):
+    for i, x in enumerate(block):
+        block[i] = Instruction.from_json(x).to_json()
+    
 
 def lvn_inplace(block: list):
     s = State()
@@ -37,6 +79,26 @@ def lvn_inplace(block: list):
             new_instructions.append(ins)
             continue
         
+        # we see an assignment - do the job right now.
+        
+        dst = ins["dest"]
+        op = ins["op"]
+        args = ins.get("args", [])
+
+        rs = s.records
+
+        if op != "const":
+            hash = tuple([op, *args])
+        else:
+            val = ins["value"]
+            hash = f"const {val}"
+
+        rs.append(Record(
+            canonical=dst,
+            hash=hash,
+        ))
+        
+        raise ValueError(ins)
         
 
 def local_ssa_inplace(block: list):
@@ -82,8 +144,9 @@ def main(j: dict):
     
     for f in j["functions"]:
         instructions = f["instrs"]
-        local_ssa_inplace(block=instructions)
-        lvn_inplace(block=instructions)
+        ins_encode_decode_id(instructions)
+        # local_ssa_inplace(block=instructions)
+        # lvn_inplace(block=instructions)
     
 
 if __name__ == "__main__":
@@ -91,4 +154,4 @@ if __name__ == "__main__":
     # print(text)
     j = json.loads(text)
     main(j)
-    json.dump(j, sys.stdout)
+    json.dump(j, sys.stdout, indent=2)
