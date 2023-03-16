@@ -11,26 +11,11 @@ from dead_code_removal import main as DCR
 class Record:
     canonical: str
     hash: tuple
-    idx: int
-
-
-# class Numbering(dict):
-#     def __init__(self):
-#         super(self)
-#         self.fresh_idx = 0
-
-#     def _fresh(self):
-#         ret = self.fresh_idx
-#         self.fresh_idx += 1
-#         return ret
-    
-#     def new(self, r: Record):
-#         r.idx = self._fresh()
-        
 
 @dataclass
 class State:
     records: list[Record] = field(default_factory=list)
+    mapping : dict[str, Record] = field(default_factory=dict)
 
 @dataclass
 class Instruction:
@@ -70,36 +55,81 @@ def ins_encode_decode_id(block: list):
         block[i] = Instruction.from_json(x).to_json()
     
 
-def lvn_inplace(block: list):
-    s = State()
-    new_instructions = []
+def lvn_inplace_block(block: list, initial_state: State):
+    """
+    Note that initial state is not necessariliy empty, because
+    we need to have some mappings for e.g. function arguments.
+    """
+    new_instructions: list[Instruction] = []
+
+    mapping = initial_state.mapping
+    rs      = initial_state.records
+
     for ins in block:
-        if ins.get("dest") is None:
+        ins = Instruction.from_json(ins)
+        
+        if ins.dest is None:
             # do nothing (eg. for 'print').
             new_instructions.append(ins)
             continue
-        
-        # we see an assignment - do the job right now.
-        
-        dst = ins["dest"]
-        op = ins["op"]
-        args = ins.get("args", [])
 
-        rs = s.records
-
-        if op != "const":
-            hash = tuple([op, *args])
+        # Calculate the hash.
+        if ins.op == "const":
+            hash = f"const {ins.value}"
         else:
-            val = ins["value"]
-            hash = f"const {val}"
+            # each 'arg' is a variable name, already defined.
+            aargs = [rs.index(mapping[x]) for x in ins.args]
+            hash = tuple([ins.op, *aargs])
+        
+        # Update mapping, based on if the hash already was computed. 
+        matches = [x for x in rs if x.hash == hash]
+        if len(matches):
+            # my value expression was already calculated at some point..
+            r, = matches  # make sure there is only one match.
+            mapping[ins.dest] = r
+        else:
+            # i was never calculated before.
+            r = Record(
+                canonical=ins.dest,
+                hash=hash,
+            )
+            rs.append(r)
+            mapping[ins.dest] = r
+        
+        # Calculate instruction to replace old one.
+        new_args = [mapping[a].canonical for a in ins.args]
+        ins.args = new_args
+        new_instructions.append(ins)
 
-        rs.append(Record(
-            canonical=dst,
-            hash=hash,
-        ))
-        
-        raise ValueError(ins)
-        
+    def dump_crap():
+        from tabulate import tabulate
+        print(f"=================mapping: \n{mapping}")
+        print(f"records: \n{tabulate([x.__dict__ for x in rs])}")
+    
+    # dump_crap()
+
+
+    # huh, we must do in-place with current abstraction right?
+    for i, (_, new) in enumerate(zip(block, new_instructions)):
+        block[i] = new.to_json()
+
+
+def lvn_inplace(function: dict):
+    
+    rs: list[Record ]= []
+    m: dict[str, Record] = dict()
+    
+    for x in function.get("args", []):
+        name = x["name"]
+        r = Record(
+            canonical=name,
+            hash=f"unique_hash_{x}",
+        )
+        rs.append(r)
+        m[name] = r
+    state = State(records=rs, mapping=m)
+    lvn_inplace_block(initial_state=state, block=function["instrs"])
+
 
 def local_ssa_inplace(block: list):
     """
@@ -144,9 +174,11 @@ def main(j: dict):
     
     for f in j["functions"]:
         instructions = f["instrs"]
-        ins_encode_decode_id(instructions)
-        # local_ssa_inplace(block=instructions)
-        # lvn_inplace(block=instructions)
+        # ins_encode_decode_id(instructions)
+        local_ssa_inplace(block=instructions)
+        lvn_inplace(function=f)
+    for _ in range(5):
+        DCR(j)
     
 
 if __name__ == "__main__":
