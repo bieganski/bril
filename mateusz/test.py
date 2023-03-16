@@ -53,7 +53,7 @@ def main(*args):
         ie, ret = run_and_parse(f"set -o pipefail; cat {x} | bril2json | brili -p")
         opt_pass = get_git_root() / "mateusz/lec3/lvn.py"
         y = Path(x).with_suffix(".mtk")
-        _ie, _ret = run_and_parse(f"set -o pipefail; cat {x} | bril2json | {opt_pass} | bril2txt | tee {y} | bril2json | brili -p")
+        _ie, _ret = run_and_parse(f"set -o pipefail; cat {x} | bril2json | {opt_pass} | tee wtf | bril2txt | tee {y} | bril2json | brili -p")
 
         def match_source(gt: Path, mtk: Path) -> bool:
             """
@@ -67,7 +67,7 @@ def main(*args):
         if match_source(gt=x, mtk=y):
             y.unlink()
         else:
-            logging.info(f"saving {y}")
+            logging.info(f"saving {y} becuase it differs from corresponding .bril")
         
         if _ret != ret:
             raise ValueError(f"output mismatch: gt: {ret} against {_ret}")
