@@ -138,6 +138,19 @@ def lvn_inplace_block(block: list, initial_state: State):
                     # calculate the compile-time-known value below.
                     value=FOLDABLE_OPS[ins.op](*arg_const_vals),
                 )
+        # Copy propagation.
+        if ins.op == BrilOp.ID:
+            assert len(ins.args) == 1
+            x, = ins.args
+            if mapping[x].hash[0] == BrilOp.CONST:
+                ins = Instruction(
+                    op=BrilOp.CONST,
+                    type=ins.type,
+                    value=mapping[x].hash[1], # fetch value
+                    args=[],
+                    funcs=None,
+                    dest=ins.dest,
+                )
 
         # Calculate the hash.
         if ins.op == BrilOp.CONST:
