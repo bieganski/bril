@@ -5,6 +5,7 @@ import sys
 from typing import Optional
 from dataclasses import dataclass, field
 from enum import Enum, unique
+from copy import deepcopy
 
 from dead_code_removal import main as DCR
 
@@ -98,7 +99,6 @@ def ins_encode_decode_id(block: list):
     for i, x in enumerate(block):
         block[i] = Instruction.from_json(x).to_json()
     
-
 def lvn_inplace_block(block: list, initial_state: State):
     """
     Note that initial state is not necessariliy empty, because
@@ -116,10 +116,32 @@ def lvn_inplace_block(block: list, initial_state: State):
             # do nothing (eg. for 'print').
             new_instructions.append(ins)
             continue
+        
+        # First try to fold compile-time known expressions.
+        if ins.op in FOLDABLE_OPS:
+            arg_const_vals : list[int] = []
+            for x in ins.args:
+                rr = mapping[x]
+                if rr.hash[0] != BrilOp.CONST:
+                    break
+                arg_const_vals.append(rr.hash[1])
+            else:
+                # 'break' was never called, so all arguments are const.
+
+                # note that we only overwrite 'ins', and then follow the usual path.
+                ins = Instruction(
+                    op=BrilOp.CONST,
+                    type=ins.type,
+                    args=[],
+                    dest=ins.dest,
+                    funcs=None,
+                    # calculate the compile-time-known value below.
+                    value=FOLDABLE_OPS[ins.op](*arg_const_vals),
+                )
 
         # Calculate the hash.
         if ins.op == BrilOp.CONST:
-            hash = f"const {ins.value}"
+            hash = tuple([ins.op, ins.value])
         else:
             # each 'arg' is a variable name, already defined.
             aargs = [rs.index(mapping[x]) for x in ins.args]
@@ -144,8 +166,10 @@ def lvn_inplace_block(block: list, initial_state: State):
         
         # Calculate instruction to replace old one.
         new_args = [mapping[a].canonical for a in ins.args]
-        ins.args = new_args
-        new_instructions.append(ins)
+        new_ins = deepcopy(ins)
+        new_ins.args = new_args
+        
+        new_instructions.append(new_ins)
 
     def dump_crap():
         from tabulate import tabulate
