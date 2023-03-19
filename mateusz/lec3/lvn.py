@@ -40,6 +40,11 @@ class BrilOp(Enum):
     AND = "and"
     NOT = "not"
 
+COMMUTE_OPS = {
+    BrilOp.ADD,
+    BrilOp.MUL,
+}
+
 FOLDABLE_OPS = {
     BrilOp.ADD:     lambda a, b: a + b,
     BrilOp.MUL:     lambda a, b: a * b,
@@ -118,6 +123,8 @@ def lvn_inplace_block(block: list, initial_state: State):
         else:
             # each 'arg' is a variable name, already defined.
             aargs = [rs.index(mapping[x]) for x in ins.args]
+            if ins.op in COMMUTE_OPS:
+                aargs.sort()
             hash = tuple([ins.op, *aargs])
         
         # Update mapping, based on if the hash already was computed. 
