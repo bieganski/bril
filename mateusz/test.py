@@ -72,6 +72,9 @@ def main(*args):
         
         if _ret != ret:
             raise ValueError(f"output mismatch: gt: {ret} against {_ret}")
+        
+        if _ie == ie:
+            logging.warning(f"~~~ ~ No speedup for {x}")
         if _ie > ie:
             raise ValueError("too much instructions executed!")
         if _ie < ie:

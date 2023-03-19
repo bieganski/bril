@@ -4,6 +4,7 @@ import json
 import sys
 from typing import Optional
 from dataclasses import dataclass, field
+from enum import Enum, unique
 
 from dead_code_removal import main as DCR
 
@@ -17,9 +18,47 @@ class State:
     records: list[Record] = field(default_factory=list)
     mapping : dict[str, Record] = field(default_factory=dict)
 
+@unique
+class BrilOp(Enum):
+    CONST = "const"
+    JUMP = "jmp"
+    ID = "id"
+    PRINT = "print"
+    CALL = "call"
+
+    ADD = "add"
+    MUL = "mul"
+    SUB = "sub"
+    DIV = "div"
+    GT = "gt"
+    LT = "lt"
+    GE = "ge"
+    LE = "le"
+    NE = "ne"
+    EQ = "eq"
+    OR = "or"
+    AND = "and"
+    NOT = "not"
+
+FOLDABLE_OPS = {
+    BrilOp.ADD:     lambda a, b: a + b,
+    BrilOp.MUL:     lambda a, b: a * b,
+    BrilOp.SUB:     lambda a, b: a - b,
+    BrilOp.DIV:     lambda a, b: a // b,
+    BrilOp.GT:      lambda a, b: a > b,
+    BrilOp.LT:      lambda a, b: a < b,
+    BrilOp.GE:      lambda a, b: a >= b,
+    BrilOp.LE:      lambda a, b: a <= b,
+    BrilOp.NE:      lambda a, b: a != b,
+    BrilOp.EQ:      lambda a, b: a == b,
+    BrilOp.OR:      lambda a, b: a or b,
+    BrilOp.AND:     lambda a, b: a and b,
+    BrilOp.NOT:     lambda a: not a
+}
+
 @dataclass
 class Instruction:
-    op: str # the only obligatory field, due to bril specs.
+    op: BrilOp # the only obligatory field, due to bril specs.
     type: str
     args: list[str]
     dest: Optional[str]
@@ -30,7 +69,7 @@ class Instruction:
     @staticmethod
     def from_json(j: dict) -> "Instruction":
         return Instruction(
-            op=j["op"],
+            op=BrilOp(j["op"]),
             args=j.get("args", []),
             type=j.get("type", "int"),
             
@@ -41,7 +80,7 @@ class Instruction:
         )
     
     def to_json(self):
-        res = {"op": self.op, "args": self.args, "type": self.type}
+        res = {"op": self.op.value, "args": self.args, "type": self.type}
 
         for x in ["value", "dest", "funcs"]:
             field = getattr(self, x)
@@ -74,7 +113,7 @@ def lvn_inplace_block(block: list, initial_state: State):
             continue
 
         # Calculate the hash.
-        if ins.op == "const":
+        if ins.op == BrilOp.CONST:
             hash = f"const {ins.value}"
         else:
             # each 'arg' is a variable name, already defined.
