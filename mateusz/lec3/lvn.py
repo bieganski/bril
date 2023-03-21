@@ -2,11 +2,10 @@
 
 import json
 import sys
-from typing import Optional
 from dataclasses import dataclass, field
-from enum import Enum, unique
 from copy import deepcopy
 
+from bril_utils import Instruction, BrilOp
 from dead_code_removal import main as DCR
 
 @dataclass
@@ -18,28 +17,6 @@ class Record:
 class State:
     records: list[Record] = field(default_factory=list)
     mapping : dict[str, Record] = field(default_factory=dict)
-
-@unique
-class BrilOp(Enum):
-    CONST = "const"
-    JUMP = "jmp"
-    ID = "id"
-    PRINT = "print"
-    CALL = "call"
-
-    ADD = "add"
-    MUL = "mul"
-    SUB = "sub"
-    DIV = "div"
-    GT = "gt"
-    LT = "lt"
-    GE = "ge"
-    LE = "le"
-    NE = "ne"
-    EQ = "eq"
-    OR = "or"
-    AND = "and"
-    NOT = "not"
 
 COMMUTE_OPS = {
     BrilOp.ADD,
@@ -61,39 +38,6 @@ FOLDABLE_OPS = {
     BrilOp.AND:     lambda a, b: a and b,
     BrilOp.NOT:     lambda a: not a
 }
-
-@dataclass
-class Instruction:
-    op: BrilOp # the only obligatory field, due to bril specs.
-    type: str
-    args: list[str]
-    dest: Optional[str]
-    value: Optional[int]
-    funcs: Optional[list[str]]
-    
-
-    @staticmethod
-    def from_json(j: dict) -> "Instruction":
-        return Instruction(
-            op=BrilOp(j["op"]),
-            args=j.get("args", []),
-            type=j.get("type", "int"),
-            
-            value=j.get("value"),
-            dest=j.get("dest"),
-
-            funcs = j.get("funcs")
-        )
-    
-    def to_json(self):
-        res = {"op": self.op.value, "args": self.args, "type": self.type}
-
-        for x in ["value", "dest", "funcs"]:
-            field = getattr(self, x)
-            if field is not None:
-                res[x] = field
-        
-        return res
 
 def ins_encode_decode_id(block: list):
     for i, x in enumerate(block):
