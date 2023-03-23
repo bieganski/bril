@@ -87,6 +87,8 @@ def main(files: list[Path], mode: TestMode):
         
         if _ret != ret:
             raise ValueError(f"output mismatch: gt: {ret} against {_ret}")
+        else:
+            logging.info(f"GT: \n{ret}\nMTK: \n{_ret}\n")
         
         if _ie == ie:
             logging.warning(f"~~~ ~ No speedup for {x}")
