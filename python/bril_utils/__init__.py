@@ -78,7 +78,9 @@ def parse_code_line(j: dict) -> Instruction | Label:
 @dataclass
 class BasicBlock:
     code: list[Instruction]
-    name: str
+    name: str  # only for debug, not supposed to rely on it's value.
+
+    # it's up to user to keep 'nexts' and 'prevs' consistent.
     nexts: list["BasicBlock"] = None
     prevs: list["BasicBlock"] = field(default_factory=list)
 
