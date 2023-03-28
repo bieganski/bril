@@ -38,18 +38,35 @@ class Label:
 @dataclass
 class Instruction:
     op: BrilOp # the only obligatory field, due to bril specs.
+    loc: int # unique for each line in function.
     type: str
     args: list[str]
     dest: Optional[str]
     value: Optional[int]
     funcs: Optional[list[str]]
     labels: Optional[list[str]]
-    
 
+    def __eq__(self, __o: object) -> bool:
+        return self.loc == __o.loc
+    
+    def __repr__(self) -> str:
+        match self.op:
+            case BrilOp.CONST:
+                s = f"{self.dest} = const {self.value}"
+            case BrilOp.PRINT:
+                s = f"print {self.args}"
+            case BrilOp.BRANCH:
+                s = f"br {self.args} {self.labels}"
+            case _:
+                s = super().__repr__()
+        return s
+
+    
     @staticmethod
-    def from_json(j: dict) -> "Instruction":
+    def from_json(j: dict, loc: int) -> "Instruction":
         return Instruction(
             op=BrilOp(j["op"]),
+            loc=loc,
             args=j.get("args", []),
             type=j.get("type", "int"),
             
@@ -69,11 +86,21 @@ class Instruction:
                 res[x] = field
         
         return res
+    
+    def filter_out_killed_by_me(self, instructions: list["Instruction"]) -> list["Instruction"]:
+        return [x for x in instructions if x.dest is None or (x.dest != self.dest)]
+    
+    def wrapping_block(self, blocks: "BasicBlock") -> "BasicBlock":
+        for b in blocks:
+            if self in blocks.code:
+                return b
+        raise ValueError(f"Could not find {self} in any basic block from list of {len(blocks)} given!")
+    
 
-def parse_code_line(j: dict) -> Instruction | Label:
+def parse_code_line(j: dict, loc: int) -> Instruction | Label:
     if "op" not in j:
         return Label(name=j["label"])
-    return Instruction.from_json(j)
+    return Instruction.from_json(j, loc=loc)
 
 @dataclass
 class BasicBlock:
@@ -89,7 +116,11 @@ class BasicBlock:
         return self.code[-1]
 
     def __repr__(self) -> str:
-        return f"block {self.name}, nexts: {self.nexts}"
+        return f"block {self.name}"
+
+    def __hash__(self) -> int:
+        return sum([x.loc for x in self.code])
+
 
 
 def flow_ctrl_targets(ins: Instruction) -> list[str]:
@@ -103,12 +134,19 @@ def flow_ctrl_targets(ins: Instruction) -> list[str]:
 
 FunctionName = str
 
+def find_top_block(blocks : BasicBlock) -> BasicBlock:
+    """
+    TODO: we shouldn't rely on .name in order to determine entry block..
+    """
+    b, = [x for x in blocks if x.name is None]
+    return b
+
 def to_basic_blocks(j: dict) -> list[dict[FunctionName, BasicBlock]]:
     res = dict()
 
     for f in j["functions"]:
         fun_name = f["name"]
-        instructions = [parse_code_line(i) for i in f["instrs"]] 
+        instructions = [parse_code_line(ins, loc=i) for i, ins in enumerate(f["instrs"])]
         
         d = defaultdict(list)
 

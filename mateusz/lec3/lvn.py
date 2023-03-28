@@ -39,10 +39,6 @@ FOLDABLE_OPS = {
     BrilOp.NOT:     lambda a: not a
 }
 
-def ins_encode_decode_id(block: list):
-    for i, x in enumerate(block):
-        block[i] = Instruction.from_json(x).to_json()
-    
 def lvn_inplace_block(block: list, initial_state: State):
     """
     Note that initial state is not necessariliy empty, because
@@ -53,8 +49,8 @@ def lvn_inplace_block(block: list, initial_state: State):
     mapping = initial_state.mapping
     rs      = initial_state.records
 
-    for ins in block:
-        ins = Instruction.from_json(ins)
+    for i, ins in enumerate(block):
+        ins = Instruction.from_json(ins, loc=i)
         
         if ins.dest is None:
             # do nothing (eg. for 'print').
@@ -75,6 +71,8 @@ def lvn_inplace_block(block: list, initial_state: State):
                 # note that we only overwrite 'ins', and then follow the usual path.
                 ins = Instruction(
                     op=BrilOp.CONST,
+                    labels=[],
+                    loc=ins.loc,
                     type=ins.type,
                     args=[],
                     dest=ins.dest,
@@ -89,7 +87,9 @@ def lvn_inplace_block(block: list, initial_state: State):
             if mapping[x].hash[0] == BrilOp.CONST:
                 ins = Instruction(
                     op=BrilOp.CONST,
+                    labels=[],
                     type=ins.type,
+                    loc=ins.loc,
                     value=mapping[x].hash[1], # fetch value
                     args=[],
                     funcs=None,
@@ -201,7 +201,6 @@ def main(j: dict):
     
     for f in j["functions"]:
         instructions = f["instrs"]
-        # ins_encode_decode_id(instructions)
         local_ssa_inplace(block=instructions)
         lvn_inplace(function=f)
     for _ in range(5):

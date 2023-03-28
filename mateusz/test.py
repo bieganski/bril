@@ -6,7 +6,7 @@ from pathlib import Path
 from enum import Enum
 from argparse import ArgumentParser
 
-from ikva_utils.misc.utils import get_color_logging_object, get_git_root
+from bril_utils.misc.utils import get_color_logging_object, get_git_root
 
 logging = get_color_logging_object()
 
