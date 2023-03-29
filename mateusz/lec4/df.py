@@ -62,32 +62,32 @@ def main(j: dict):
 
     # Calculate reachable definitions for each basic block.
 
-    Reaching_Def_Val_T = list[Instruction]
+    Reaching_Def_Val_T = set[Instruction]
 
     def reaching_def_transfer(b: BasicBlock, in_val: Reaching_Def_Val_T) -> Reaching_Def_Val_T:
-
-        in_val = [x for x in in_val]
-        assignments = []
+        in_val = set([x for x in in_val])
+        assignments = set()
 
         for ins in b.code:
             if not ins.dest:
                 continue
-            in_val = ins.filter_out_killed_by_me(in_val)
-            assignments.append(ins)
+            in_val = set(ins.filter_out_killed_by_me(in_val))
+            assignments.add(ins)
         
-        return in_val + assignments
+        return in_val.union(assignments)
 
 
     def reaching_def_merge(vals: list[Reaching_Def_Val_T]) -> Reaching_Def_Val_T:
-        from functools import reduce
-        from operator import __add__
-        return reduce(__add__, vals, [])
+        if not vals:
+            return set()
+        s, *ss = vals
+        return s.union(*ss)
 
     mapping = forward_df(
         blocks=blocks,
         entry=entry,
-        entry_val=[],
-        init=[],
+        entry_val=set(),
+        init=set(),
         transfer=reaching_def_transfer,
         merge=reaching_def_merge,
     )

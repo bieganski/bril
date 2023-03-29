@@ -46,6 +46,9 @@ class Instruction:
     funcs: Optional[list[str]]
     labels: Optional[list[str]]
 
+    def __hash__(self) -> int:
+        return self.loc
+
     def __eq__(self, __o: object) -> bool:
         return self.loc == __o.loc
     
@@ -57,9 +60,11 @@ class Instruction:
                 s = f"print {self.args}"
             case BrilOp.BRANCH:
                 s = f"br {self.args} {self.labels}"
+            case BrilOp.JUMP:
+                s = f"jmp {self.args} {self.labels}"
             case _:
-                s = super().__repr__()
-        return s
+                s = f"{self.dest} = {self.op} {self.args}"
+        return f"{s}, loc {self.loc}"
 
     
     @staticmethod
@@ -119,7 +124,7 @@ class BasicBlock:
         return f"block {self.name}"
 
     def __hash__(self) -> int:
-        return sum([x.loc for x in self.code])
+        return hash(self.code[0])
 
 
 
