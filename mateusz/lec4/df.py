@@ -60,6 +60,11 @@ def main(j: dict):
     blocks = to_basic_blocks(j)
     entry = find_top_block(blocks)
 
+
+    dominators = calculate_dominators(blocks=blocks)
+
+    raise ValueError(dominators)
+
     # Calculate reachable definitions for each basic block.
 
     Reaching_Def_Val_T = set[Instruction]
@@ -94,7 +99,24 @@ def main(j: dict):
 
     from pprint import pformat
     raise ValueError(pformat(mapping))
-    
+
+
+def calculate_dominators(blocks: list[BasicBlock]) -> dict[BasicBlock, set[BasicBlock]]:
+    from copy import copy
+    from functools import reduce
+
+    prev = None # not 'dict', in order to trigger 'do-while' first iteration.
+    cur = dict([(b, set([b])) for b in blocks])
+
+    while prev != cur:
+        prev = copy(cur)
+        for b in blocks:
+            match b.prevs:
+                case x, *y: # non-empty list.
+                    cur[b] = cur[b].union(cur[x].intersection(*[cur[z] for z in y]))
+                case _:
+                    pass
+    return cur
 
 if __name__ == "__main__":
     text = str(sys.stdin.read())
