@@ -2,11 +2,11 @@
 
 import json
 import sys
-from typing import Callable, Any, Tuple
-
-from bril_utils import Instruction, BrilOp, BasicBlock, parse_code_line, Label, to_basic_blocks, find_top_block
+from typing import Any
 
 from bril_utils.misc.utils import get_color_logging_object
+from bril_utils import BasicBlock, to_basic_blocks, find_top_block, calculate_dominators
+
 
 import logging as log_module
 
@@ -30,12 +30,10 @@ def main(j: dict):
     blocks = to_basic_blocks(j)
     entry = find_top_block(blocks)
 
-    entry_frontiers = calculate_dominance_frontiers(
-        for_who=entry,
+    frontiers = calculate_dominance_frontiers(
         blocks=blocks
     )
-
-    raise ValueError((entry_frontiers))
+    raise ValueError(frontiers[entry])
 
     # new_blocks = to_ssa(
     #     blocks=blocks,
@@ -46,11 +44,23 @@ def main(j: dict):
 
 
 
-def calculate_dominance_frontiers(for_who: BasicBlock, blocks: list[BasicBlock]) -> list[BasicBlock]:
-    from copy import copy
-    from functools import reduce
+def calculate_dominance_frontiers(blocks: list[BasicBlock]) -> dict[BasicBlock, set[BasicBlock]]:
+
+    dominators : dict[BasicBlock, set(BasicBlock)] = calculate_dominators(blocks)
+
+    from collections import defaultdict
+
+    frontiers = defaultdict(set)
+
+    for b, ds in dominators.items():
+        for n in b.nexts:
+            for d in ds:
+                if d not in dominators[n]:
+                    frontiers[d].add(n)
     
-    raise NotImplementedError()
+    return frontiers
+            
+    
 
 if __name__ == "__main__":
     text = str(sys.stdin.read())

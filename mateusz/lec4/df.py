@@ -4,8 +4,7 @@ import json
 import sys
 from typing import Callable, Any, Tuple
 
-from bril_utils import Instruction, BrilOp, BasicBlock, parse_code_line, Label, to_basic_blocks, find_top_block
-
+from bril_utils import Instruction, BasicBlock, to_basic_blocks, find_top_block, calculate_dominators
 from bril_utils.misc.utils import get_color_logging_object
 
 import logging as log_module
@@ -57,9 +56,8 @@ def main(j: dict):
     """
     Computes LVN, modifies code in a way that applies lvn-related optimizations.
     """
-    blocks = to_basic_blocks(j)
-    entry = find_top_block(blocks)
-
+    entry, blocks = to_basic_blocks(j)
+    blocks = blocks["main"] # XXX
 
     dominators = calculate_dominators(blocks=blocks)
 
@@ -100,23 +98,6 @@ def main(j: dict):
     from pprint import pformat
     raise ValueError(pformat(mapping))
 
-
-def calculate_dominators(blocks: list[BasicBlock]) -> dict[BasicBlock, set[BasicBlock]]:
-    from copy import copy
-    from functools import reduce
-
-    prev = None # not 'dict', in order to trigger 'do-while' first iteration.
-    cur = dict([(b, set([b])) for b in blocks])
-
-    while prev != cur:
-        prev = copy(cur)
-        for b in blocks:
-            match b.prevs:
-                case x, *y: # non-empty list.
-                    cur[b] = cur[b].union(cur[x].intersection(*[cur[z] for z in y]))
-                case _:
-                    pass
-    return cur
 
 if __name__ == "__main__":
     text = str(sys.stdin.read())

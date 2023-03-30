@@ -1,5 +1,5 @@
 from enum import Enum, unique
-from typing import Optional
+from typing import Optional, Sequence, Tuple
 from dataclasses import dataclass, field
 from collections import defaultdict
 
@@ -139,14 +139,8 @@ def flow_ctrl_targets(ins: Instruction) -> list[str]:
 
 FunctionName = str
 
-def find_top_block(blocks : BasicBlock) -> BasicBlock:
-    """
-    TODO: we shouldn't rely on .name in order to determine entry block..
-    """
-    b, = [x for x in blocks if x.name is None]
-    return b
 
-def to_basic_blocks(j: dict) -> list[dict[FunctionName, BasicBlock]]:
+def to_basic_blocks(j: dict) -> Tuple[BasicBlock, dict[FunctionName, Sequence[BasicBlock]]]:
     res = dict()
 
     for f in j["functions"]:
@@ -184,6 +178,22 @@ def to_basic_blocks(j: dict) -> list[dict[FunctionName, BasicBlock]]:
             for b in block.nexts:
                 b.prevs.append(block)
 
-        return [x for x in d.values()]
+        res[fun_name] = [x for x in d.values()]
 
     return res
+
+def calculate_dominators(blocks: list[BasicBlock]) -> dict[BasicBlock, set[BasicBlock]]:
+    from copy import copy
+
+    prev = None # not 'dict', in order to trigger 'do-while' first iteration.
+    cur = dict([(b, set([b])) for b in blocks])
+
+    while prev != cur:
+        prev = copy(cur)
+        for b in blocks:
+            match b.prevs:
+                case x, *y: # non-empty list.
+                    cur[b] = cur[b].union(cur[x].intersection(*[cur[z] for z in y]))
+                case _:
+                    pass
+    return cur

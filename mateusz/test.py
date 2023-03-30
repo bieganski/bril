@@ -13,6 +13,7 @@ logging = get_color_logging_object()
 class TestMode(Enum):
     LVN = "lvn"
     DF = "df"
+    TO_SSA = "to_ssa"
     
 
 # from logging import CRITICAL
@@ -26,9 +27,12 @@ blacklist = [
 OPT_PASS = {
     TestMode.LVN: "mateusz/lec3/lvn.py",
     TestMode.DF: "mateusz/lec4/df.py",
+    TestMode.TO_SSA: "mateusz/lec5/to_ssa.py",
 }
 
-def main(files: list[Path], mode: TestMode):
+def main(files: list[Path], mode: TestMode, args: list):
+
+    args = " ".join(args)
     
     if len(files):
         # handle command-line specified tests..
@@ -66,10 +70,10 @@ def main(files: list[Path], mode: TestMode):
             ret_value = stdout
             return instructions_executed, ret_value
 
-        ie, ret = run_and_parse(f"set -o pipefail; cat {x} | bril2json | brili -p")
+        ie, ret = run_and_parse(f"set -o pipefail; cat {x} | bril2json | brili {args} -p")
         
         y = Path(x).with_suffix(".mtk")
-        _ie, _ret = run_and_parse(f"set -o pipefail; cat {x} | bril2json | {opt_pass} | tee wtf | bril2txt | tee {y} | bril2json | brili -p")
+        _ie, _ret = run_and_parse(f"set -o pipefail; cat {x} | bril2json | {opt_pass} | tee wtf | bril2txt | tee {y} | bril2json | brili {args} -p")
 
         def match_source(gt: Path, mtk: Path) -> bool:
             """
@@ -101,6 +105,7 @@ def main(files: list[Path], mode: TestMode):
 if __name__ == "__main__":
     p = ArgumentParser()
     p.add_argument("--files", nargs="+", type=Path, default=[])
+    p.add_argument("--args", nargs="+", type=str, default=[])
     p.add_argument("--mode", type=TestMode, required=True, choices=[x for x in TestMode])
 
     main(**vars(p.parse_args()))
