@@ -50,6 +50,8 @@ class Instruction:
         return self.loc
 
     def __eq__(self, __o: object) -> bool:
+        if not isinstance(__o, Instruction):
+            return False
         return self.loc == __o.loc
     
     def __repr__(self) -> str:
@@ -95,9 +97,9 @@ class Instruction:
     def filter_out_killed_by_me(self, instructions: list["Instruction"]) -> list["Instruction"]:
         return [x for x in instructions if x.dest is None or (x.dest != self.dest)]
     
-    def wrapping_block(self, blocks: "BasicBlock") -> "BasicBlock":
+    def wrapping_block(self, blocks: Sequence["BasicBlock"]) -> "BasicBlock":
         for b in blocks:
-            if self in blocks.code:
+            if self in b.code:
                 return b
         raise ValueError(f"Could not find {self} in any basic block from list of {len(blocks)} given!")
     
@@ -110,10 +112,10 @@ def parse_code_line(j: dict, loc: int) -> Instruction | Label:
 @dataclass
 class BasicBlock:
     code: list[Instruction]
-    name: str  # only for debug, not supposed to rely on it's value.
+    name: Optional[str]  # only for debug, not supposed to rely on it's value.
 
     # it's up to user to keep 'nexts' and 'prevs' consistent.
-    nexts: list["BasicBlock"] = None
+    nexts: list["BasicBlock"] = field(default_factory=list)
     prevs: list["BasicBlock"] = field(default_factory=list)
 
     @property
@@ -131,6 +133,7 @@ class BasicBlock:
 def flow_ctrl_targets(ins: Instruction) -> list[str]:
     match ins.op:
         case BrilOp.JUMP | BrilOp.BRANCH:
+            assert isinstance(ins.labels, list)
             return ins.labels
         case _:
             assert not ins.labels, ins
@@ -140,7 +143,10 @@ def flow_ctrl_targets(ins: Instruction) -> list[str]:
 FunctionName = str
 
 
-def to_basic_blocks(j: dict) -> Tuple[BasicBlock, dict[FunctionName, Sequence[BasicBlock]]]:
+def to_basic_blocks(j: dict) -> dict[FunctionName, Tuple[BasicBlock, list[BasicBlock]]]:
+    """
+    Returns (entry_block, map[fun -> blocks])
+    """
     res = dict()
 
     for f in j["functions"]:
@@ -155,30 +161,34 @@ def to_basic_blocks(j: dict) -> Tuple[BasicBlock, dict[FunctionName, Sequence[Ba
         # BUG: it will break on two consecutive labels, without instructions in between,
         # if some jump refers to first label.
         cur_label = None
+        first_label = -1
         for x in instructions:
             match x:
                 case Label(name=name):
                     cur_label = name
                 case Instruction() as i:
+                    if first_label == -1: # we cannot use 'None' as initial value.
+                        first_label = cur_label # type: ignore
                     d[cur_label].append(i)
                 case _:
                     raise ValueError("unexpected implementation error")
         
         # .nexts fields are not yet initialized
-        d = dict((k, BasicBlock(code=v, name=k)) for k, v in d.items())
-
+        dd = dict((k, BasicBlock(code=v, name=k)) for k, v in d.items())
+        del d
+        
         # In order to fix BUG above, we need to insert some NOPs in between,
         # as below code works under assumption that block.code is non-empty.
-        for _, block in d.items():
+        for _, block in dd.items():
             jmp_targets = flow_ctrl_targets(block.last_instr)
-            block.nexts = [d[k] for k in jmp_targets]
+            block.nexts = [dd[k] for k in jmp_targets]
 
         # .nexts are fine, in second iteration fill .prevs
-        for _, block in d.items():
+        for _, block in dd.items():
             for b in block.nexts:
                 b.prevs.append(block)
 
-        res[fun_name] = [x for x in d.values()]
+        res[fun_name] = dd[first_label], [x for x in dd.values()] # type: ignore
 
     return res
 
@@ -197,3 +207,7 @@ def calculate_dominators(blocks: list[BasicBlock]) -> dict[BasicBlock, set[Basic
                 case _:
                     pass
     return cur
+
+
+def uses(var: str, block: BasicBlock) -> Sequence[Instruction]:
+    return [ins for ins in block.code if var in ins.args]

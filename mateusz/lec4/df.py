@@ -53,12 +53,9 @@ def forward_df(
     )
 
 def main(j: dict):
-    """
-    Computes LVN, modifies code in a way that applies lvn-related optimizations.
-    """
-    entry, blocks = to_basic_blocks(j)
-    blocks = blocks["main"] # XXX
-
+    blocks = to_basic_blocks(j)
+    entry, blocks = blocks["main"] # XXX
+    
     dominators = calculate_dominators(blocks=blocks)
 
     raise ValueError(dominators)
