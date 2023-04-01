@@ -2,11 +2,12 @@
 
 import json
 import sys
-from typing import Any, Sequence
+from typing import Any, Sequence, Optional
 from collections import defaultdict
 
 from bril_utils.misc.utils import get_color_logging_object
-from bril_utils import BasicBlock, Instruction, to_basic_blocks, calculate_dominators, uses
+from bril_utils import Instruction, BasicBlock, to_basic_blocks, calculate_dominators, uses
+from bril_utils.algo.df import calculate_reaching_defs_dict
 
 
 import logging as log_module
@@ -37,17 +38,27 @@ def to_ssa(
     blocks: list[BasicBlock],
     entry: BasicBlock,
 ) -> list[BasicBlock]:
-    frontiers = calculate_dominance_frontiers(blocks)
-    # left, = [x for x in blocks if x.name == "left"]
-    # raise ValueError(frontiers[left])
+
+    new_blocks = [x for x in blocks] # copy.
+
     defs = calculate_defs(blocks)
+
+    Twice = dict[str, set[Instruction]]
     
-    for name, def_blocks in defs.items():
-        for db in def_blocks:
-            for f in frontiers[db]:
-                pass
-    
-    return [] # XXX mypy
+    reaching_defs : dict[BasicBlock, tuple[Twice, Twice]] = calculate_reaching_defs_dict(
+        blocks=blocks,
+        entry=entry,
+    )
+
+    for name, _ in defs.items():
+        for b in blocks:
+            in_defs: Optional[set[Any]] = reaching_defs[b][0].get(name)
+            if in_defs is None or len(in_defs) == 1:
+                continue
+            # detected need to insert PHI node.
+             
+
+    return new_blocks
 
 
 def main(j: dict):

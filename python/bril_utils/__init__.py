@@ -1,5 +1,5 @@
 from enum import Enum, unique
-from typing import Optional, Sequence, Tuple
+from typing import Optional, Sequence
 from dataclasses import dataclass, field
 from collections import defaultdict
 
@@ -143,7 +143,7 @@ def flow_ctrl_targets(ins: Instruction) -> list[str]:
 FunctionName = str
 
 
-def to_basic_blocks(j: dict) -> dict[FunctionName, Tuple[BasicBlock, list[BasicBlock]]]:
+def to_basic_blocks(j: dict) -> dict[FunctionName, tuple[BasicBlock, list[BasicBlock]]]:
     """
     Returns (entry_block, map[fun -> blocks])
     """

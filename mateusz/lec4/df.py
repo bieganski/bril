@@ -6,6 +6,7 @@ from typing import Callable, Any, Tuple
 
 from bril_utils import Instruction, BasicBlock, to_basic_blocks, find_top_block, calculate_dominators
 from bril_utils.misc.utils import get_color_logging_object
+from bril_utils.algo.df import calculate_reaching_defs
 
 import logging as log_module
 
@@ -55,46 +56,12 @@ def forward_df(
 def main(j: dict):
     blocks = to_basic_blocks(j)
     entry, blocks = blocks["main"] # XXX
-    
-    dominators = calculate_dominators(blocks=blocks)
-
-    raise ValueError(dominators)
-
-    # Calculate reachable definitions for each basic block.
-
-    Reaching_Def_Val_T = set[Instruction]
-
-    def reaching_def_transfer(b: BasicBlock, in_val: Reaching_Def_Val_T) -> Reaching_Def_Val_T:
-        in_val = set([x for x in in_val])
-        assignments = set()
-
-        for ins in b.code:
-            if not ins.dest:
-                continue
-            in_val = set(ins.filter_out_killed_by_me(in_val))
-            assignments.add(ins)
-        
-        return in_val.union(assignments)
-
-
-    def reaching_def_merge(vals: list[Reaching_Def_Val_T]) -> Reaching_Def_Val_T:
-        if not vals:
-            return set()
-        s, *ss = vals
-        return s.union(*ss)
-
-    mapping = forward_df(
+    res = calculate_reaching_defs(
         blocks=blocks,
         entry=entry,
-        entry_val=set(),
-        init=set(),
-        transfer=reaching_def_transfer,
-        merge=reaching_def_merge,
     )
-
     from pprint import pformat
-    raise ValueError(pformat(mapping))
-
+    raise ValueError(pformat(res))
 
 if __name__ == "__main__":
     text = str(sys.stdin.read())
