@@ -17,9 +17,6 @@ log_module.basicConfig(level=log_module.DEBUG)
 logging = get_color_logging_object()
 
 
-DF_Val_Type = Any
-
-
 def _flatten(lst):
     from functools import reduce
     from operator import __add__

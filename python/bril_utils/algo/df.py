@@ -90,18 +90,15 @@ def calculate_reaching_defs(
 
 
 T_master, T_slave = Any, Any
-def set_to_dict_lmao(s: set[T_master], f: Callable[[T_master], T_slave]) -> dict[T_slave, set[T_master]]:
-    """
-    should be called group_by or something.
-    """
+def group_by(s: set[T_master], f: Callable[[T_master], T_slave]) -> dict[T_slave, set[T_master]]:
     from collections import defaultdict
     d = defaultdict(list)
     for v in s:
         d[f(v)].append(v)
     return dict([(k, set(v)) for k, v in d.items()])
 
-_Type = dict[str, set[Instruction]]
 
+_Type = dict[str, set[Instruction]]
 def calculate_reaching_defs_dict(
     blocks: list[BasicBlock],
     entry: BasicBlock,
@@ -116,6 +113,6 @@ def calculate_reaching_defs_dict(
     for k, (v1, v2) in reaching_defs.items():
         
         res[k] = tuple([
-            set_to_dict_lmao(x, f) for x in (v1, v2)
+            group_by(x, f) for x in (v1, v2)
         ])
     return res

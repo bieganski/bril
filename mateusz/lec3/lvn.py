@@ -50,7 +50,7 @@ def lvn_inplace_block(block: list, initial_state: State):
     rs      = initial_state.records
 
     for i, ins in enumerate(block):
-        ins = Instruction.from_json(ins, loc=i)
+        ins = Instruction.from_json(ins, id=i)
         
         if ins.dest is None:
             # do nothing (eg. for 'print').
@@ -72,7 +72,7 @@ def lvn_inplace_block(block: list, initial_state: State):
                 ins = Instruction(
                     op=BrilOp.CONST,
                     labels=[],
-                    loc=ins.loc,
+                    id=ins.id,
                     type=ins.type,
                     args=[],
                     dest=ins.dest,
@@ -89,7 +89,7 @@ def lvn_inplace_block(block: list, initial_state: State):
                     op=BrilOp.CONST,
                     labels=[],
                     type=ins.type,
-                    loc=ins.loc,
+                    id=ins.id,
                     value=mapping[x].hash[1], # fetch value
                     args=[],
                     funcs=None,

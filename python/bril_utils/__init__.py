@@ -2,6 +2,9 @@ from enum import Enum, unique
 from typing import Optional, Sequence
 from dataclasses import dataclass, field
 from collections import defaultdict
+from functools import singledispatch
+
+from bril_utils.tools import fresh
 
 # XXX
 from pprint import pformat, pprint
@@ -12,6 +15,7 @@ class BrilOp(Enum):
     ID = "id"
     PRINT = "print"
     RET = "ret"
+    NOP = "nop"
 
     JUMP = "jmp"
     BRANCH = "br"
@@ -38,21 +42,23 @@ class Label:
 @dataclass
 class Instruction:
     op: BrilOp # the only obligatory field, due to bril specs.
-    loc: int # unique for each line in function.
-    type: str
-    args: list[str]
-    dest: Optional[str]
-    value: Optional[int]
-    funcs: Optional[list[str]]
-    labels: Optional[list[str]]
+    
+    id: int # unique for each instruction in function. not necessarily ordered.
+    
+    args: list[str] = field(default_factory=list)
+    labels: list[str] = field(default_factory=list)
+    funcs: list[str] = field(default_factory=list)
+    type: Optional[str] = None
+    dest: Optional[str] = None
+    value: Optional[int] = None
 
     def __hash__(self) -> int:
-        return self.loc
+        return self.id
 
     def __eq__(self, __o: object) -> bool:
         if not isinstance(__o, Instruction):
             return False
-        return self.loc == __o.loc
+        return self.id == __o.id
     
     def __repr__(self) -> str:
         match self.op:
@@ -66,14 +72,14 @@ class Instruction:
                 s = f"jmp {self.args} {self.labels}"
             case _:
                 s = f"{self.dest} = {self.op} {self.args}"
-        return f"{s}, loc {self.loc}"
+        return f"{s}, loc {self.id}"
 
     
     @staticmethod
-    def from_json(j: dict, loc: int) -> "Instruction":
+    def from_json(j: dict, id: int) -> "Instruction":
         return Instruction(
             op=BrilOp(j["op"]),
-            loc=loc,
+            id=id,
             args=j.get("args", []),
             type=j.get("type", "int"),
             
@@ -102,17 +108,28 @@ class Instruction:
             if self in b.code:
                 return b
         raise ValueError(f"Could not find {self} in any basic block from list of {len(blocks)} given!")
-    
 
-def parse_code_line(j: dict, loc: int) -> Instruction | Label:
+class InstructionGenerator:
+    @staticmethod
+    def _generic_gen_ins(id: int, **kwargs) -> Instruction:
+        return Instruction(
+            id=id,
+            **kwargs,
+        )
+    
+    def nop(id: int) -> Instruction:
+        return __class__._generic_gen_ins(id=id, op=BrilOp.NOP)
+
+
+def parse_code_line(j: dict, id: int) -> Instruction | Label:
     if "op" not in j:
         return Label(name=j["label"])
-    return Instruction.from_json(j, loc=loc)
+    return Instruction.from_json(j, id=id)
 
 @dataclass
 class BasicBlock:
     code: list[Instruction]
-    name: Optional[str]  # only for debug, not supposed to rely on it's value.
+    name: Optional[str] = None # only for debug, not supposed to rely on it's value.
 
     # it's up to user to keep 'nexts' and 'prevs' consistent.
     nexts: list["BasicBlock"] = field(default_factory=list)
@@ -140,38 +157,95 @@ def flow_ctrl_targets(ins: Instruction) -> list[str]:
             return []
 
 
+def fresh_label(instructions: Sequence[Instruction | Label], prefix=str):
+    env = [
+        x.name for x in instructions if isinstance(x, Label)
+    ]
+    return next(fresh(existing=env, prefix=prefix))
+
+def fresh_ins_id(blocks_or_inss: Sequence[BasicBlock] | Sequence[Instruction]) -> int:
+    """
+    To understand the `yield` advantage over `return` in that case, 
+    let's consider following example:
+    
+    We just parsed the IR source code and to make sure that there are no empty basic blocks,
+    we insert NOPs between each two consecutive labels. The code would look like this:
+
+    for ins in instructions:
+        if isinstance(ins, Label) and len(cur_block.code) == 0:
+            new_id = fresh_ins_id(instructions)
+            nop = nop_ins(..., id=new_id)
+            cur_block.code.append(nop)
+    
+    Note that during exeuction of such loop, providing that the 'if' condition was executed at least once,
+    the 'instructions' variable cannot be used safely, as it doesn't reflect real instructions in basic blocks.
+    So the 'fresh_ins_id(instructions)' expression is not right - we should pass 'instructions + list_of_all_inserted_nops`.
+
+    To avoid such complexity, we use generators here, by doing: `gen = fresh_ins_id(instructions)` before the loop.
+    """
+    if len(blocks_or_inss) == 0:
+        raise ValueError("len(blocks_or_inss) == 0") # CHANGE_ME to just 'yield 0' if such case is expected.
+    
+    def helper(blocks: Sequence[BasicBlock]):
+        mmax = -1
+        for b in blocks:
+            mmax = max([x.id for x in b.code if isinstance(x, Instruction)])
+        while True:
+            mmax += 1
+            yield mmax
+    
+    if isinstance(blocks_or_inss[0], Instruction):
+        yield from helper([BasicBlock(code=blocks_or_inss)])
+    else:
+        assert isinstance(blocks_or_inss[0], BasicBlock)
+        yield from helper(blocks_or_inss)
+
 FunctionName = str
-
-
 def to_basic_blocks(j: dict) -> dict[FunctionName, tuple[BasicBlock, list[BasicBlock]]]:
     """
     Returns (entry_block, map[fun -> blocks])
     """
     res = dict()
 
+    
+    gen = fresh_ins_id(instructions) # docstring of 'fresh_ins_id' is worth reading!
+    
     for f in j["functions"]:
         fun_name = f["name"]
-        instructions = [parse_code_line(ins, loc=i) for i, ins in enumerate(f["instrs"])]
-        
+        instructions = [parse_code_line(ins, id=i) for i, ins in enumerate(f["instrs"])]
+
+        if not isinstance(instructions[0], Label):
+            # add a dummy label
+            entry_label = fresh_label(instructions=instructions, prefix="entry")
+            nop_id = next(gen)
+            nop = InstructionGenerator.nop(id=nop_id)
+            instructions = [Label(name=entry_label), nop] + instructions
+
         d = defaultdict(list)
 
         # Assign each instruction to currently active label.
-        # Discard unused labels (those with 0 corresponding instructions).
-        # 'None' marks default label (start of function).
-        # BUG: it will break on two consecutive labels, without instructions in between,
-        # if some jump refers to first label.
-        cur_label = None
-        first_label = -1
+        cur_block = None
         for x in instructions:
             match x:
                 case Label(name=name):
+                    if cur_block is None:
+                        # i'm a first label.
+                        cur_label = name
+                        continue
+                    # some block already exists.
+                    # check if block just processed is not empty, or insert a NOP.
+                    if not d[cur_label]:
+                        nop_id = next(gen)
+                        nop = InstructionGenerator.nop(id=nop_id)
+                        d[cur_label].append(nop)
                     cur_label = name
                 case Instruction() as i:
-                    if first_label == -1: # we cannot use 'None' as initial value.
-                        first_label = cur_label # type: ignore
                     d[cur_label].append(i)
                 case _:
                     raise ValueError("unexpected implementation error")
+
+        # delete it, as it no longer reflects reality.
+        del instructions
         
         # .nexts fields are not yet initialized
         dd = dict((k, BasicBlock(code=v, name=k)) for k, v in d.items())
