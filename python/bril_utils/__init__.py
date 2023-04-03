@@ -2,7 +2,6 @@ from enum import Enum, unique
 from typing import Optional, Sequence
 from dataclasses import dataclass, field
 from collections import defaultdict
-from functools import singledispatch
 
 from bril_utils.tools import fresh
 
@@ -140,7 +139,7 @@ class BasicBlock:
         return self.code[-1]
 
     def __repr__(self) -> str:
-        return f"block {self.name}"
+        return f"block {self.name} (> {[x.name for x in self.nexts]}) (< {[x.name for x in self.prevs]})"
 
     def __hash__(self) -> int:
         return hash(self.code[0])
@@ -206,13 +205,11 @@ def to_basic_blocks(j: dict) -> dict[FunctionName, tuple[BasicBlock, list[BasicB
     Returns (entry_block, map[fun -> blocks])
     """
     res = dict()
-
-    
-    gen = fresh_ins_id(instructions) # docstring of 'fresh_ins_id' is worth reading!
     
     for f in j["functions"]:
         fun_name = f["name"]
         instructions = [parse_code_line(ins, id=i) for i, ins in enumerate(f["instrs"])]
+        gen = fresh_ins_id(instructions) # docstring of 'fresh_ins_id' is worth reading!
 
         if not isinstance(instructions[0], Label):
             # add a dummy label
@@ -250,19 +247,29 @@ def to_basic_blocks(j: dict) -> dict[FunctionName, tuple[BasicBlock, list[BasicB
         # .nexts fields are not yet initialized
         dd = dict((k, BasicBlock(code=v, name=k)) for k, v in d.items())
         del d
-        
-        # In order to fix BUG above, we need to insert some NOPs in between,
-        # as below code works under assumption that block.code is non-empty.
-        for _, block in dd.items():
+
+        # dicts are insertion-ordered since python 3.7
+        labels_ordered = [x for x in dd.keys()]
+        for label, block in dd.items():
             jmp_targets = flow_ctrl_targets(block.last_instr)
-            block.nexts = [dd[k] for k in jmp_targets]
+            if len(jmp_targets) == 0:
+                # label1:
+                # nop (e.g.)
+                # label2:
+                # ... 
+                my_idx = labels_ordered.index(label)
+                if my_idx != len(labels_ordered) - 1:
+                    # i'm not an end of function
+                    block.nexts = [my_idx + 1]
+            else:
+                block.nexts = [dd[k] for k in jmp_targets]
 
         # .nexts are fine, in second iteration fill .prevs
         for _, block in dd.items():
             for b in block.nexts:
                 b.prevs.append(block)
 
-        res[fun_name] = dd[first_label], [x for x in dd.values()] # type: ignore
+        res[fun_name] = dd[labels_ordered[0]], [x for x in dd.values()] # type: ignore
 
     return res
 

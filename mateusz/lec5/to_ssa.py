@@ -17,6 +17,9 @@ log_module.basicConfig(level=log_module.DEBUG)
 logging = get_color_logging_object()
 
 
+from pprint import pformat # XXX
+
+
 def _flatten(lst):
     from functools import reduce
     from operator import __add__
@@ -61,12 +64,12 @@ def to_ssa(
 def main(j: dict):
     _blocks = to_basic_blocks(j)
     entry, blocks = _blocks["main"]
+    raise ValueError(pformat(blocks))
 
     new_blocks = to_ssa(
         blocks=blocks,
         entry=entry,
     )
-    from pprint import pformat
     raise ValueError(pformat(new_blocks))
 
 
