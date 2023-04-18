@@ -139,7 +139,11 @@ class BasicBlock:
         return self.code[-1]
 
     def __repr__(self) -> str:
-        return f"block {self.name} (> {[x.name for x in self.nexts]}) (< {[x.name for x in self.prevs]})"
+        return str.upper(self.name)
+
+    def __str__(self) -> str:
+        return self.__repr__()
+        # return f"block {self.name} (> {[x.name for x in self.nexts]}) (< {[x.name for x in self.prevs]})"
 
     def __hash__(self) -> int:
         return hash(self.code[0])

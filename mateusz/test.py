@@ -30,6 +30,28 @@ OPT_PASS = {
     TestMode.TO_SSA: "mateusz/lec5/to_ssa.py",
 }
 
+def lvn_tests() -> list[Path | str]:
+    top_dir = Path(__file__).parent.parent
+    tests_dir = top_dir / "examples" / "test" / "lvn"
+    files = glob.glob(str(tests_dir / "*.bril"))
+    return files
+
+def df_tests() -> list[Path | str]:
+    top_dir = Path(__file__).parent.parent
+    tests_dir = top_dir / "examples" / "test" / "df"
+    return [tests_dir / "cond.bril"]
+
+def to_ssa_tests() -> list[Path | str]:
+    top_dir = Path(__file__).parent.parent
+    tests_dir = top_dir / "examples" / "test" / "to_ssa"
+    return [tests_dir / "if.bril"]
+
+SUPPORTED_TESTS_PER_OPT = {
+    TestMode.LVN: lvn_tests(),
+    TestMode.DF: df_tests(),
+    TestMode.TO_SSA: to_ssa_tests(),
+}
+
 def main(files: list[Path], mode: TestMode, args: list):
 
     args = " ".join(args)
@@ -39,12 +61,9 @@ def main(files: list[Path], mode: TestMode, args: list):
         for x in files:
             assert x.suffix == ".bril", x
             assert x.exists(), x
-        tests = files
     else:
         # ..or fallback to default tests.
-        top_dir = Path(__file__).parent.parent
-        tests_dir = top_dir / "examples" / "test" / "lvn"
-        files = glob.glob(str(tests_dir / "*.bril"))
+        files = SUPPORTED_TESTS_PER_OPT[mode]
 
     tests = [Path(x) for x in files]
 

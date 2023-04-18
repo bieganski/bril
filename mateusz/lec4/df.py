@@ -4,7 +4,7 @@ import json
 import sys
 from typing import Callable, Any, Tuple
 
-from bril_utils import Instruction, BasicBlock, to_basic_blocks, find_top_block, calculate_dominators
+from bril_utils import Instruction, BasicBlock, to_basic_blocks, calculate_dominators
 from bril_utils.misc.utils import get_color_logging_object
 from bril_utils.algo.df import calculate_reaching_defs
 

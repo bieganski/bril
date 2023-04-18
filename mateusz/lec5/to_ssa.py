@@ -43,20 +43,9 @@ def to_ssa(
 
     defs = calculate_defs(blocks)
 
-    Twice = dict[str, set[Instruction]]
-    
-    reaching_defs : dict[BasicBlock, tuple[Twice, Twice]] = calculate_reaching_defs_dict(
-        blocks=blocks,
-        entry=entry,
-    )
+    frontiers = calculate_dominance_frontiers(blocks=blocks)
 
-    for name, _ in defs.items():
-        for b in blocks:
-            in_defs: Optional[set[Any]] = reaching_defs[b][0].get(name)
-            if in_defs is None or len(in_defs) == 1:
-                continue
-            # detected need to insert PHI node.
-             
+    raise ValueError(frontiers)
 
     return new_blocks
 
@@ -64,7 +53,6 @@ def to_ssa(
 def main(j: dict):
     _blocks = to_basic_blocks(j)
     entry, blocks = _blocks["main"]
-    raise ValueError(pformat(blocks))
 
     new_blocks = to_ssa(
         blocks=blocks,
@@ -79,16 +67,19 @@ def calculate_dominance_frontiers(blocks: list[BasicBlock]) -> dict[BasicBlock, 
     dominators : dict[BasicBlock, set[BasicBlock]] = calculate_dominators(blocks)
 
     from collections import defaultdict
-
     frontiers = defaultdict(set)
 
-    for b, ds in dominators.items():
-        for n in b.nexts:
-            for d in ds:
-                if d not in dominators[n]:
-                    frontiers[d].add(n)
-    
-    return frontiers
+    for node in blocks:
+        for p in node.prevs:
+            if p not in dominators[node]:
+                # node is not dominated by some of it's direct ancestor 'p'.
+                # so it must be a frontier for all of 'p's dominators.
+                for x in dominators[p]:
+                    if x not in dominators[node]:
+                        logging.info(f"{p} does not dominate {node} and {x} dominates {p} __AND__ {x} does not dominate {node}, so {node} is a frontier of {x}")
+                        frontiers[x].add(node)
+
+    return dict(frontiers)
             
     
 
