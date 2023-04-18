@@ -41,11 +41,20 @@ def to_ssa(
 
     new_blocks = [x for x in blocks] # copy.
 
+    from functools import reduce
+    from operator import __add__
+
     defs = calculate_defs(blocks)
+    vars = reduce(__add__, defs.keys())
 
     frontiers = calculate_dominance_frontiers(blocks=blocks)
 
-    raise ValueError(frontiers)
+    for v in vars:
+        for b in defs[v]:
+            # 'v' was assigned in a block 'b'.
+            # for each dominance frontier of 'b' we should seek for 'v' as well?
+            for b_df in frontiers[b]:
+                pass
 
     return new_blocks
 
